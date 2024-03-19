@@ -65,14 +65,14 @@ class Server:
             try:
                 buffer = activer["socket"].recv(1024).decode()
                 body = json.loads(buffer)
-                
+
                 if body["type"] == "logout":
                     # 用户退出时关闭连接, 然后从connections中删除该用户
                     activer["socket"].close()
                     self.avtive_list.remove(activer)
                     # 结束该用户线程
                     break
-                
+
                 elif body["type"] == "chat":
                     found_target = False
                     # 遍历在线用户列表, 并将消息发送给该用户
@@ -84,9 +84,11 @@ class Server:
                     # 如果未找到该在线用户, 则暂存至消息队列中
                     if not found_target:
                         self.message_queue.append(body)
-            
+
             except Exception:
-                logging.error(f"连接失效: {activer['socket'].getsockname()}, {activer['socket'].fileno()}")
+                logging.error(
+                    f"连接失效: {activer['socket'].getsockname()}, {activer['socket'].fileno()}"
+                )
                 activer["socket"].close()
                 self.avtive_list.remove(activer)
 
@@ -124,21 +126,17 @@ class Server:
                     index_to_drop = []
                     if len(self.message_queue) > 0:
                         for i, msg in enumerate(self.message_queue):
-                            if msg["to"] == body["username"]:
-                                active_socket.send(
-                                    f"{msg['from']}: {msg['content']}".encode()
-                                )
+                            if msg["to"] == body["username"] and msg["type"] == "chat":
+                                active_socket.send(json.dumps(msg).encode())
                                 index_to_drop.append(i)
                     # 删除已读消息
                     if len(index_to_drop) > 0:
                         self.message_queue = list(
                             filter(lambda x: x not in index_to_drop, self.message_queue)
                         )
-                    
+
                     # 开启用户线程
-                    thread = threading.Thread(
-                        target=self.user_thread, args=(activer,)
-                    )
+                    thread = threading.Thread(target=self.user_thread, args=(activer,))
                     thread.setDaemon(True)
                     thread.start()
                 else:
@@ -164,28 +162,31 @@ class Server:
             logging.error(
                 f"无法连接: {active_socket.getsockname()}, {active_socket.fileno()}"
             )
-    
+
     def start(self):
-        """服务器, 启动!
-        """
+        """服务器, 启动!"""
         logging.info(f"绑定地址 {IP}:{PORT}")
         self.server.bind((IP, PORT))
         logging.info(f"启动服务器")
         self.server.listen(10)
-        
+
         # 初始化连接
         self.avtive_list.clear()
         self.message_queue.clear()
-        
+
         # 开始监听
         while True:
             try:
                 connection, addr = self.server.accept()
                 logging.info(f"连接来自 {addr[0]}:{addr[1]}")
                 # 开启新线程
-                thread = threading.Thread(target=self.wait_for_login, args=(connection, addr))
+                thread = threading.Thread(
+                    target=self.wait_for_login, args=(connection, addr)
+                )
                 thread.setDaemon(True)
                 thread.start()
-            
+
             except Exception:
-                logging.error(f"连接异常: {connection.getsockname()}, {connection.fileno()}")
+                logging.error(
+                    f"连接异常: {connection.getsockname()}, {connection.fileno()}"
+                )
