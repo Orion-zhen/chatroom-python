@@ -6,7 +6,9 @@ from config.server_config import IP, PORT
 from server.database import get_user, add_user
 
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
 
 class Server:
@@ -25,7 +27,7 @@ class Server:
         ]
         """
         self.connections = []
-        
+
         """消息队列
         message_queue = [
             {
@@ -37,9 +39,22 @@ class Server:
         ]
         """
         self.message_queue = []
-        
-    
-    
+
+    def braodcast(self, username="system", message=""):
+        """广播消息
+
+        Args:
+            username (str, optional): 发送广播消息的用户名称. Defaults to "system".
+            message (str, optional): 广播的消息内容. Defaults to "".
+        """
+        for i, connection in enumerate(self.connections):
+            if connection["username"] == username:
+                connection["socket"].send(
+                    json.dumps(
+                        {"type": "braodcast", "from": username, "content": message}
+                    ).encode()
+                )
+
     def user_thread(self, connection):
         """专门接收该用户消息并进行处理的线程
         可以进行的操作有: 私聊, 广播, 传输文件, 语音聊天
@@ -48,8 +63,7 @@ class Server:
             connection (socket.socket): 用户和服务器连接的socket
         """
         pass
-    
-    
+
     def wait_for_login(self, connection, addr):
         """对于服务器端接收到的连接, 进入等待登录函数, 等待该连接的发起方发送登录或注册信息
 
@@ -68,35 +82,58 @@ class Server:
                         "socket": connection,
                         "ip": addr[0],
                         "port": addr[1],
-                        "username": body["username"]
+                        "username": body["username"],
                     }
                     self.connections.append(user_info)
-                    connection.send(json.dumps({"type": "approval", "detail": f"{body['username']} is logged in"}).encode())
-                    
+                    connection.send(
+                        json.dumps(
+                            {
+                                "type": "approval",
+                                "detail": f"{body['username']} is logged in",
+                            }
+                        ).encode()
+                    )
+
                     # 在登录成功后检查离线消息
                     index_to_drop = []
                     if len(self.message_queue) > 0:
                         for i, msg in enumerate(self.message_queue):
                             if msg["to"] == body["username"]:
-                                connection.send(f"{msg['from']}: {msg['content']}".encode())
+                                connection.send(
+                                    f"{msg['from']}: {msg['content']}".encode()
+                                )
                                 index_to_drop.append(i)
                     # 删除已读消息
                     if len(index_to_drop) > 0:
-                        self.message_queue = list(filter(lambda x: x not in index_to_drop, self.message_queue))
-                    
-                    thread = threading.Thread(target=self.user_thread, args=(connection,))
+                        self.message_queue = list(
+                            filter(lambda x: x not in index_to_drop, self.message_queue)
+                        )
+
+                    thread = threading.Thread(
+                        target=self.user_thread, args=(connection,)
+                    )
                     thread.setDaemon(True)
                     thread.start()
                 else:
-                    connection.send(json.dumps({"type": "denial", "detail": "login failed"}).encode())
-            
+                    connection.send(
+                        json.dumps(
+                            {"type": "denial", "detail": "login failed"}
+                        ).encode()
+                    )
+
             elif body["type"] == "signin":
                 if data_base_info == None:
                     # 数据库中没有该用户名, 则注册之
                     add_user(body["username"], body["password"])
                 else:
                     # 有, 则返回用户名冲突
-                    connection.send(json.dumps({"type": "denial", "detail": "username already exists"}).encode())
-        
+                    connection.send(
+                        json.dumps(
+                            {"type": "denial", "detail": "username already exists"}
+                        ).encode()
+                    )
+
         except Exception:
-            logging.error(f"无法连接: {connection.getsockname()}, {connection.fileno()}")
+            logging.error(
+                f"无法连接: {connection.getsockname()}, {connection.fileno()}"
+            )
