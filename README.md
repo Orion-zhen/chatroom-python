@@ -81,7 +81,8 @@
     "from": "<selfname>",
     "to": "<username>",
     "filename": "<filename>",
-    "filesize": <filesize>
+    "filesize": <filesize>,
+    "hash": "<hash>"
 }
 ```
 
@@ -89,13 +90,14 @@
 
 如果收信人在线, 则服务端向收信人转发该ftp请求报文
 
-收信人收到连接开启报文后, 在本地开辟一个新的TCP服务端并返回IP地址和端口
+收信人收到连接开启报文后, 检查本地文件的哈希是否相等, 若不相等则在本地开辟一个新的TCP服务端并返回IP地址和端口
 
 ```json
 {
-    "type": "ftp_request",
+    "type": "ftp_relpy",
     "ip": "<ip>",
-    "port": <port>
+    "port": <port>,
+    "offset": <offset>
 }
 ```
 
@@ -104,3 +106,33 @@
 若收信人不在线, 则服务端开始接收文件. 收信人接收文件的行为和服务端类似
 
 发信人收到连接开启报文后, 在本地开辟一个新的TCP连接, 并循环发送固定大小的文件片段, 直到文件发送完成
+
+### 断点续传
+
+发信人接收到键盘事件`Crtl+C`后中止发送, 收信人保存本地未接受完的文件
+
+### 语音聊天
+
+和文件传输类似, 客户端首先在本地开辟一个UDP服务端, 并发送连接开启报文
+
+```json
+{
+    "type": "voice",
+    "from": "<selfname>",
+    "to": "<username>",
+    "ip": "<ip>",
+    "port": <port>
+}
+```
+
+服务端受到信息后转送给收信人, 收信人收到连接开启报文后, 同样开辟一个UDP连接, 并发送连接开启报文
+
+```json
+{
+    "type": "voice",
+    "from": "<selfname>",
+    "to": "<username>",
+    "ip": "<ip>",
+    "port": <port>
+}
+```
