@@ -48,7 +48,7 @@
 
 ```json
 {
-    "type": "signin",
+    "type": "signup",
     "username": "<username>",
     "password": "<password>"
 }
