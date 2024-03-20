@@ -15,29 +15,34 @@ class Server:
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        """活动中的用户列表
-        active_list = [
-            {
+        self.active_dict = {}
+        """活动中的用户字典
+        active_list = {
+            "<username>": {
                 "socket": socket,
                 "ip": ip,
                 "port": port,
-                "username": username
             },
-        ]
+        }
         """
-        self.avtive_list = []
 
+        self.message_queue = {}
         """消息队列
-        message_queue = [
-            {
-                "type": "chat",
-                "from": "<selfname>",
-                "to": "<username>",
-                "content": "<content>"
-            }
-        ]
+        message_queue = {
+            "<username>": [
+                {
+                    "type": "chat",
+                    "from": "<selfname>",
+                    "content": "<content>"
+                },
+                {
+                    "type": "chat",
+                    "from": "<selfname>",
+                    "content": "<content>"
+                },
+            ]
+        }
         """
-        self.message_queue = []
 
     def braodcast(self, username="system", message=""):
         """广播消息
@@ -46,51 +51,51 @@ class Server:
             username (str, optional): 发送广播消息的用户名称. Defaults to "system".
             message (str, optional): 广播的消息内容. Defaults to "".
         """
-        for i, connection in enumerate(self.avtive_list):
-            if connection["username"] == username:
-                connection["socket"].send(
+        for target_name in self.active_dict.keys():
+            if target_name != username:
+                # 不对自己广播
+                target_socket = self.active_dict[target_name]["socket"]
+                target_socket.send(
                     json.dumps(
-                        {"type": "braodcast", "from": username, "content": message}
+                        {"type": "broadcast", "from": username, "content": message}
                     ).encode()
                 )
 
-    def user_thread(self, activer):
+    def user_thread(self, active_name):
         """专门接收该用户消息并进行处理的线程
         可以进行的操作有: 私聊, 广播, 传输文件, 语音聊天
 
         Args:
-            activer (dict): 用户和服务器连接记录, 是self.avtive_list中的一个元素
+            active_name (str): 一个在线的用户名, 对应self.active_list中的一个键
         """
         while True:
             try:
-                buffer = activer["socket"].recv(1024).decode()
+                buffer = self.active_dict[active_name]["socket"].recv(1024).decode()
                 body = json.loads(buffer)
 
                 if body["type"] == "logout":
-                    # 用户退出时关闭连接, 然后从connections中删除该用户
-                    activer["socket"].close()
-                    self.avtive_list.remove(activer)
+                    # 用户退出时关闭连接, 然后从active_list中删除该用户
+                    self.active_dict[active_name]["socket"].close()
+                    self.active_dict.pop(active_name)
                     # 结束该用户线程
                     break
 
                 elif body["type"] == "chat":
-                    found_target = False
-                    # 遍历在线用户列表, 并将消息发送给该用户
-                    for target in self.avtive_list:
-                        if target["username"] == body["to"]:
-                            found_target = True
-                            target["socket"].send(buffer.encode())
-                            break
-                    # 如果未找到该在线用户, 则暂存至消息队列中
-                    if not found_target:
-                        self.message_queue.append(body)
+                    target_name = body["to"]
+                    if target_name in self.active_dict.keys():
+                        # 如果目标用户在活动列表中, 则发送消息
+                        target_socket = self.active_dict[target_name]["socket"]
+                        target_socket.send(buffer.encode())
+                    else:
+                        # 如果目标用户不在活动列表中, 则暂存消息
+                        self.message_queue.setdefault(target_name, []).append(body)
 
             except Exception:
                 logging.error(
-                    f"连接失效: {activer['socket'].getsockname()}, {activer['socket'].fileno()}"
+                    f"连接失效: {self.active_dict[active_name]['socket'].getsockname()}, {self.active_dict[active_name]['socket'].fileno()}"
                 )
-                activer["socket"].close()
-                self.avtive_list.remove(activer)
+                self.active_dict[active_name]["socket"].close()
+                self.active_dict.pop(active_name)
 
     def wait_for_login(self, active_socket, addr):
         """对于服务器端接收到的连接, 进入等待登录函数, 等待该连接的发起方发送登录或注册信息
@@ -110,39 +115,36 @@ class Server:
                         "socket": active_socket,
                         "ip": addr[0],
                         "port": addr[1],
-                        "username": body["username"],
                     }
-                    self.avtive_list.append(activer)
+                    self.active_dict.setdefault(body["username"], activer)
                     active_socket.send(
                         json.dumps(
                             {
                                 "type": "approval",
-                                "detail": f"{body['username']} is logged in",
+                                "content": f"{body['username']} is logged in",
                             }
                         ).encode()
                     )
 
                     # 在登录成功后检查离线消息
-                    index_to_drop = []
-                    if len(self.message_queue) > 0:
-                        for i, msg in enumerate(self.message_queue):
-                            if msg["to"] == body["username"] and msg["type"] == "chat":
+                    if body["username"] in self.message_queue.keys():
+                        for msg in self.message_queue[body["username"]]:
+                            if msg["type"] == "chat":
                                 active_socket.send(json.dumps(msg).encode())
-                                index_to_drop.append(i)
+                            elif msg["type"].startswith("ftp"):
+                                # 待实现: 离线文件传输
+                                pass
                     # 删除已读消息
-                    if len(index_to_drop) > 0:
-                        self.message_queue = list(
-                            filter(lambda x: x not in index_to_drop, self.message_queue)
-                        )
+                    self.message_queue.pop(body["username"])
 
                     # 开启用户线程
-                    thread = threading.Thread(target=self.user_thread, args=(activer,))
+                    thread = threading.Thread(target=self.user_thread, args=(body["username"],))
                     thread.setDaemon(True)
                     thread.start()
                 else:
                     active_socket.send(
                         json.dumps(
-                            {"type": "denial", "detail": "login failed"}
+                            {"type": "denial", "content": "login failed"}
                         ).encode()
                     )
 
@@ -154,7 +156,7 @@ class Server:
                     # 有, 则返回用户名冲突
                     active_socket.send(
                         json.dumps(
-                            {"type": "denial", "detail": "username already exists"}
+                            {"type": "denial", "content": "username already exists"}
                         ).encode()
                     )
 
@@ -162,6 +164,7 @@ class Server:
             logging.error(
                 f"无法连接: {active_socket.getsockname()}, {active_socket.fileno()}"
             )
+            active_socket.close()
 
     def start(self):
         """服务器, 启动!"""
@@ -171,7 +174,7 @@ class Server:
         self.server.listen(10)
 
         # 初始化连接
-        self.avtive_list.clear()
+        self.active_dict.clear()
         self.message_queue.clear()
 
         # 开始监听
@@ -190,3 +193,4 @@ class Server:
                 logging.error(
                     f"连接异常: {connection.getsockname()}, {connection.fileno()}"
                 )
+                connection.close()
