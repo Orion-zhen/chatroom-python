@@ -79,7 +79,10 @@ class Server:
                     self.active_dict.pop(active_name)
                     # 结束该用户线程
                     break
-
+                
+                elif body["type"] == "broadcast":
+                    self.braodcast(active_name, body["content"])
+                
                 elif body["type"] == "chat":
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
