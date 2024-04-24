@@ -23,6 +23,15 @@ class Client(Cmd):
         self.logged_in = False
         self.ftp_host = None
 
+    def start(self):
+        server_ip = input("Input server ip: ")
+        server_port = input("Input server port: ")
+        try:
+            self.to_server.connect((server_ip, int(server_port)))
+            self.cmdloop()
+        except:
+            logging.error("Failed to connect to server")
+
     def send_to_server(self, message):
         """将消息发送到服务器
 
