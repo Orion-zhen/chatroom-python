@@ -1,3 +1,4 @@
+import time
 import json
 import socket
 import random
@@ -16,6 +17,7 @@ class Client(Cmd):
     def __init__(self):
         super.__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.buffer = 1024
         self.username = None
         self.password = None
         self.logged_in = False
@@ -33,12 +35,21 @@ class Client(Cmd):
         """从服务器接收消息"""
         while self.logged_in:
             try:
-                buffer = self.to_server.recv(1024).decode()
+                buffer = self.to_server.recv(self.buffer).decode()
                 body = json.loads(buffer)
-
+                
                 if body["type"] == "approval":
-                    print(body["content"])
+                    if not self.ftp_host:
+                        self.send_file(body["content"])
+                        self.ftp_host.close()
+                        self.ftp_host = None
+                    else:
+                        print(body["content"])
+                
                 elif body["type"] == "denial":
+                    if not self.ftp_host:
+                        self.ftp_host.close()
+                        
                     print(body["content"])
 
                 elif body["type"] == "chat":
@@ -50,12 +61,8 @@ class Client(Cmd):
                     # 收到ftp请求, 连接到对方开启的端口
                     print(f"[FTP] {body['from']}: {body['content']}")
                     decision = input("Receive it?[Y/n]: ").lower()[0]
-                    target_name = body['from']
-                    pass
+                    self.decide_ftp(decision, body)
                 elif body["type"] == "ftp_replay":
-                    pass
-
-                elif body["type"] == "voice":
                     pass
 
             except Exception:
@@ -70,7 +77,7 @@ class Client(Cmd):
             ).encode()
         )
         try:
-            buffer = self.to_server.recv(1024).decode()
+            buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
             if body["type"] == "approval":
                 # 服务器接受登录
@@ -98,7 +105,7 @@ class Client(Cmd):
         )
         
         try:
-            buffer = self.to_server.recv(1024).decode()
+            buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
             if body["type"] == "approval":
                 # 服务器接受登录
@@ -149,7 +156,7 @@ class Client(Cmd):
         ftp_port = self.get_available_port()
         self.ftp_host = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ftp_host.bind(("0.0.0.0", ftp_port))
-        self.ftp_host.listen()
+        
         message = json.dumps(
             {
                 "type": "ftp_request",
@@ -161,6 +168,8 @@ class Client(Cmd):
             }
         )
         self.send_to_server(message)
+        
+        self.ftp_host.listen()
 
     def do_logout(self, args=None):
         message = json.dumps({"type": "logout", "username": self.username})
@@ -173,7 +182,7 @@ class Client(Cmd):
         
     def get_available_port():
         while True:
-            port = random.randint(1024, 65535)  # 选择一个在1024到65535范围内的端口，这个范围是未注册端口，可以自由使用
+            port = random.randint(10000, 65535)  # 选择一个在self.buffer到65535范围内的端口，这个范围是未注册端口，可以自由使用
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 sock.bind(('localhost', port))  # 尝试绑定到这个端口
@@ -183,15 +192,17 @@ class Client(Cmd):
                 # 如果端口已被使用，捕获异常并继续循环
                 pass
     
-    def decide_ftp(self, decision: str, target_name: str, target_ip: str, target_port: str):
+    def decide_ftp(self, decision: str, body: dict):
         """根据参数决定是否接受FTP连接, 是则开始接收文件
 
         Args:
             decision (str): 决定选项
-            target_name (str): FTP请求来源用户
-            target_ip (str): FTP请求来源IP
-            target_port (str): FTP请求来源端口
+            body (dict): FTP请求报文
         """
+        target_name = body['from']
+        target_ip = body['ip']
+        target_port = body['port']
+        file_name = body['content']
         if decision != 'y':
             # 否决FTP连接, 通过服务器送到发起方
             message = json.dumps(
@@ -206,5 +217,38 @@ class Client(Cmd):
             self.send_to_server(message)
 
         else:
+            # 发送同意报文, 让发送方开始发送文件
+            message = json.dumps(
+                {
+                    "type": "approval",
+                    "from": self.username,
+                    "to": target_name,
+                    "content": file_name
+                }
+            )
+            self.send_to_server(message)
+            
+            time.sleep(1) # 睡一会儿, 防止发送方还没开始listen
+            
             # 连接到请求报文中给出的地址, 开始接收文件
-            pass
+            receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            receiver.connect((target_ip, target_port))
+            with filechunkio.open(file_name, 'rb') as f:
+                while True:
+                    chunk = receiver.recv(self.buffer)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            
+            print(f"Successfully received file {file_name} from {target_name}")
+            receiver.close()
+    
+    def send_file(self, file_name: str):
+        receiver_socket, _ = self.ftp_host.accept()
+        with filechunkio.open(file_name, "rb") as f:
+            while True:
+                chunk = f.read(self.buffer)
+                if not chunk:
+                    break
+                receiver_socket.send(chunk)
+        receiver_socket.close()

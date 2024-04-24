@@ -83,7 +83,8 @@ class Server:
                 elif body["type"] == "broadcast":
                     self.braodcast(active_name, body["content"])
                 
-                elif body["type"] == "chat":
+                # elif body["type"] == "chat":
+                else:
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息
