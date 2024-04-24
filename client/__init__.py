@@ -15,7 +15,6 @@ logging.basicConfig(
 
 class Client(Cmd):
     def __init__(self):
-        super.__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.buffer = 1024
         self.username = None
