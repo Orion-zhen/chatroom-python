@@ -10,4 +10,9 @@ if __name__ == "__main__":
     if args.server:
         import server
         instance = server.Server()
-        
+        instance.start()
+    
+    elif args.client:
+        import client
+        instance = client.Client()
+        instance.start()
