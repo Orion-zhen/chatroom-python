@@ -1,7 +1,9 @@
 import json
 import socket
+import random
 import logging
 import threading
+import filechunkio
 from cmd import Cmd
 
 
@@ -17,6 +19,7 @@ class Client(Cmd):
         self.username = None
         self.password = None
         self.logged_in = False
+        self.ftp_host = None
 
     def send_to_server(self, message):
         """将消息发送到服务器
@@ -44,6 +47,10 @@ class Client(Cmd):
                     print(f"[Broadcast] {body['from']}: {body['content']}")
 
                 elif body["type"] == "ftp_request":
+                    # 收到ftp请求, 连接到对方开启的端口
+                    print(f"[FTP] {body['from']}: {body['content']}")
+                    decision = input("Receive it?[Y/n]: ").lower()[0]
+                    target_name = body['from']
                     pass
                 elif body["type"] == "ftp_replay":
                     pass
@@ -135,6 +142,26 @@ class Client(Cmd):
         thread.setDaemon(True)
         thread.start()
 
+    def do_ftp(self, args):
+        args = args.split(" ")
+        target_name = args[0]
+        file_name = args[1]
+        ftp_port = self.get_available_port()
+        self.ftp_host = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ftp_host.bind(("0.0.0.0", ftp_port))
+        self.ftp_host.listen()
+        message = json.dumps(
+            {
+                "type": "ftp_request",
+                "from": self.username,
+                "to": target_name,
+                "ip": str(socket.gethostbyname(socket.gethostname())),
+                "port": ftp_port,
+                "content": file_name
+            }
+        )
+        self.send_to_server(message)
+
     def do_logout(self, args=None):
         message = json.dumps({"type": "logout", "username": self.username})
         thread = threading.Thread(target=self.send_to_server, args=(message,))
@@ -143,3 +170,41 @@ class Client(Cmd):
         self.logged_in = False
         self.to_server.close()
         print("Logout success!")
+        
+    def get_available_port():
+        while True:
+            port = random.randint(1024, 65535)  # 选择一个在1024到65535范围内的端口，这个范围是未注册端口，可以自由使用
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.bind(('localhost', port))  # 尝试绑定到这个端口
+                sock.close()  # 如果成功，关闭socket
+                return port  # 返回这个可用的端口
+            except socket.error as e:
+                # 如果端口已被使用，捕获异常并继续循环
+                pass
+    
+    def decide_ftp(self, decision: str, target_name: str, target_ip: str, target_port: str):
+        """根据参数决定是否接受FTP连接, 是则开始接收文件
+
+        Args:
+            decision (str): 决定选项
+            target_name (str): FTP请求来源用户
+            target_ip (str): FTP请求来源IP
+            target_port (str): FTP请求来源端口
+        """
+        if decision != 'y':
+            # 否决FTP连接, 通过服务器送到发起方
+            message = json.dumps(
+                {
+                    "type": "denial",
+                    "from": self.username,
+                    "to": target_name,
+                    "content": "FTP refused"
+                }
+            )
+            
+            self.send_to_server(message)
+
+        else:
+            # 连接到请求报文中给出的地址, 开始接收文件
+            pass
