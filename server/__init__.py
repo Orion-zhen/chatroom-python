@@ -179,6 +179,14 @@ class Server:
                             {"type": "approval", "content": "signup success"}
                         ).encode()
                     )
+                    
+                    # 添加到活跃列表
+                    activer = {
+                        "socket": active_socket,
+                        "ip": addr[0],
+                        "port": addr[1],
+                    }
+                    self.active_dict.setdefault(body["username"], activer)
                     # 开启用户线程
                     thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
                     thread.start()
