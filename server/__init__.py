@@ -14,6 +14,8 @@ logging.basicConfig(
 class Server:
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.buffer = 2048
 
         self.active_dict = {}
         """活动中的用户字典
@@ -70,10 +72,12 @@ class Server:
         """
         while True:
             try:
-                buffer = self.active_dict[active_name]["socket"].recv(1024).decode()
+                print("尝试用户线程读取消息")
+                buffer = self.active_dict[active_name]["socket"].recv(self.buffer).decode()
                 body = json.loads(buffer)
 
                 if body["type"] == "logout":
+                    logging.info(f"[User] {active_name} 退出登陆")
                     # 用户退出时关闭连接, 然后从active_list中删除该用户
                     self.active_dict[active_name]["socket"].close()
                     self.active_dict.pop(active_name)
@@ -81,10 +85,12 @@ class Server:
                     break
                 
                 elif body["type"] == "broadcast":
+                    logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.braodcast(active_name, body["content"])
                 
                 # elif body["type"] == "chat":
                 else:
+                    logging.info(f"[User] {active_name} -> {body['to']}")
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息
@@ -108,12 +114,16 @@ class Server:
             active_socket (socket.socket): 收到的连接
             addr (tuple(ip, port)): 连接来源
         """
+        print("进入等待登陆线程")
         try:
-            buffer = active_socket.recv(1024).decode()
+            print("尝试接收消息")
+            buffer = active_socket.recv(self.buffer).decode()
             body = json.loads(buffer)
+            print("接收消息成功")
             if body["type"] == "login":
                 data_base_info = get_user(body["username"])
                 if data_base_info != None and body["password"] == data_base_info[1]:
+                    print("密码正确")
                     # 数据库中有并且密码正确
                     activer = {
                         "socket": active_socket,
@@ -121,6 +131,7 @@ class Server:
                         "port": addr[1],
                     }
                     self.active_dict.setdefault(body["username"], activer)
+                    print("已添加到活跃列表")
                     active_socket.send(
                         json.dumps(
                             {
@@ -129,22 +140,25 @@ class Server:
                             }
                         ).encode()
                     )
+                    print("已发送成功消息")
 
                     # 在登录成功后检查离线消息
-                    if body["username"] in self.message_queue.keys():
+                    if body["username"] in self.message_queue:
                         for msg in self.message_queue[body["username"]]:
                             if msg["type"] == "chat":
                                 active_socket.send(json.dumps(msg).encode())
                             elif msg["type"].startswith("ftp"):
                                 # 待实现: 离线文件传输
                                 pass
-                    # 删除已读消息
-                    self.message_queue.pop(body["username"])
+                        # 删除已读消息
+                        self.message_queue.pop(body["username"])
 
                     # 开启用户线程
                     thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
                     thread.start()
+                    print("成功激活用户线程")
                 else:
+                    print("拒绝登陆")
                     active_socket.send(
                         json.dumps(
                             {"type": "denial", "content": "login failed"}
@@ -152,9 +166,23 @@ class Server:
                     )
 
             elif body["type"] == "signup":
+                print("注册请求")
+                print("搜索数据库")
+                data_base_info = get_user(body["username"])
+                print(f"数据库返回结果: {data_base_info}")
                 if data_base_info == None:
+                    print("数据库中没有该用户名, 注册之")
                     # 数据库中没有该用户名, 则注册之
                     add_user(body["username"], body["password"])
+                    active_socket.send(
+                        json.dumps(
+                            {"type": "approval", "content": "signup success"}
+                        ).encode()
+                    )
+                    # 开启用户线程
+                    thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
+                    thread.start()
+                    print("成功激活用户线程")
                 else:
                     # 有, 则返回用户名冲突
                     active_socket.send(

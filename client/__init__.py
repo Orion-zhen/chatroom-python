@@ -1,3 +1,4 @@
+import sys
 import time
 import json
 import socket
@@ -6,6 +7,7 @@ import logging
 import threading
 import filechunkio
 from cmd import Cmd
+from config.server_config import IP, PORT
 
 
 logging.basicConfig(
@@ -17,17 +19,18 @@ class Client(Cmd):
     def __init__(self):
         super().__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.buffer = 1024
+        self.buffer = 2048
         self.username = None
         self.password = None
         self.logged_in = False
         self.ftp_host = None
 
     def start(self):
-        server_ip = input("Input server ip: ")
-        server_port = input("Input server port: ")
+        # server_ip = input("Input server ip: ")
+        # server_port = input("Input server port: ")
         try:
-            self.to_server.connect((server_ip, int(server_port)))
+            # self.to_server.connect((server_ip, int(server_port)))
+            self.to_server.connect((IP, PORT))
             self.cmdloop()
         except:
             logging.error("Failed to connect to server")
@@ -76,6 +79,7 @@ class Client(Cmd):
 
             except Exception:
                 logging.error("Cannot receive message from server")
+                break
 
     def do_login(self, args=None):
         username = input("Enter your username: ")
@@ -83,7 +87,7 @@ class Client(Cmd):
         self.send_to_server(
             json.dumps(
                 {"type": "login", "username": username, "password": password}
-            ).encode()
+            )
         )
         try:
             buffer = self.to_server.recv(self.buffer).decode()
@@ -109,7 +113,7 @@ class Client(Cmd):
         self.send_to_server(
             json.dumps(
                 {"type": "signup", "username": username, "password": password}
-            ).encode()
+            )
         )
         
         try:
@@ -184,6 +188,7 @@ class Client(Cmd):
         self.logged_in = False
         self.to_server.close()
         print("Logout success!")
+        sys.exit(0)
         
     def get_available_port():
         while True:
