@@ -142,8 +142,7 @@ class Server:
                     self.message_queue.pop(body["username"])
 
                     # 开启用户线程
-                    thread = threading.Thread(target=self.user_thread, args=(body["username"],))
-                    thread.setDaemon(True)
+                    thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
                     thread.start()
                 else:
                     active_socket.send(
@@ -188,9 +187,8 @@ class Server:
                 logging.info(f"连接来自 {addr[0]}:{addr[1]}")
                 # 开启新线程
                 thread = threading.Thread(
-                    target=self.wait_for_login, args=(connection, addr)
+                    target=self.wait_for_login, args=(connection, addr), daemon=True
                 )
-                thread.setDaemon(True)
                 thread.start()
 
             except Exception:

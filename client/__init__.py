@@ -15,6 +15,7 @@ logging.basicConfig(
 
 class Client(Cmd):
     def __init__(self):
+        super().__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.buffer = 1024
         self.username = None
@@ -94,8 +95,7 @@ class Client(Cmd):
                 self.logged_in = True
                 print("Login success!")
 
-                thread = threading.Thread(target=self.receive_from_server)
-                thread.setDaemon(True)
+                thread = threading.Thread(target=self.receive_from_server, daemon=True)
                 thread.start()
             else:
                 print(body["content"])
@@ -139,8 +139,7 @@ class Client(Cmd):
             }
         )
 
-        thread = threading.Thread(target=self.send_to_server, args=(message,))
-        thread.setDaemon(True)
+        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
 
     def do_broadcast(self, args):
@@ -153,8 +152,7 @@ class Client(Cmd):
             }
         )
 
-        thread = threading.Thread(target=self.send_to_server, args=(message,))
-        thread.setDaemon(True)
+        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
 
     def do_ftp(self, args):
@@ -181,8 +179,7 @@ class Client(Cmd):
 
     def do_logout(self, args=None):
         message = json.dumps({"type": "logout", "username": self.username})
-        thread = threading.Thread(target=self.send_to_server, args=(message,))
-        thread.setDaemon(True)
+        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
         self.logged_in = False
         self.to_server.close()
