@@ -47,20 +47,20 @@ class Client(Cmd):
     def receive_from_server(self):
         """从服务器接收消息"""
         while self.logged_in:
-            try:
+            # try:
                 buffer = self.to_server.recv(self.buffer).decode()
                 body = json.loads(buffer)
                 
-                if body["type"] == "approval":
+                # if body["type"] == "approval":
                     # if not self.ftp_host:
-                        print("得到响应")
-                        self.send_file(body["content"])
-                        self.ftp_host.close()
-                        self.ftp_host = None
+                        # print("得到响应")
+                        # self.send_file(body["content"])
+                        # self.ftp_host.close()
+                        # self.ftp_host = None
                     # else:
                     #     print(body["content"])
                 
-                elif body["type"] == "denial":
+                if body["type"] == "denial":
                     if not self.ftp_host:
                         self.ftp_host.close()
                         
@@ -78,9 +78,12 @@ class Client(Cmd):
                     target_port = body['port']
                     file_name = body['content']
                     print("发起连接")
-                    receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    receiver.connect((target_ip, target_port))
-                    with filechunkio.open(file_name, 'rb') as f:
+                    try:
+                        receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        receiver.connect((target_ip, target_port))
+                    except:
+                        print("连接失败")
+                    with open(file_name, 'wb') as f:
                         while True:
                             chunk = receiver.recv(self.buffer)
                             if not chunk:
@@ -92,9 +95,9 @@ class Client(Cmd):
                 elif body["type"] == "ftp_replay":
                     pass
 
-            except Exception:
-                logging.error("Cannot receive message from server")
-                # break
+            # except Exception:
+            #     logging.error("Cannot receive message from server")
+            #     # break
 
     def do_login(self, args=None):
         username = input("Enter your username: ")
@@ -202,7 +205,7 @@ class Client(Cmd):
         
         receiver_socket, _ = self.ftp_host.accept()
         print("收到连接")
-        with filechunkio.open(file_path, "rb") as f:
+        with open(file_path, "rb") as f:
             while True:
                 chunk = f.read(self.buffer)
                 if not chunk:
@@ -273,7 +276,7 @@ class Client(Cmd):
             print("发起连接")
             receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             receiver.connect((target_ip, target_port))
-            with filechunkio.open(file_name, 'rb') as f:
+            with open(file_name, 'rb') as f:
                 while True:
                     chunk = receiver.recv(self.buffer)
                     if not chunk:
