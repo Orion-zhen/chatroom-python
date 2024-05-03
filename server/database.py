@@ -6,6 +6,8 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     password TEXT NOT NULL
 )''')
+cursor.close()
+database.close()
 
 
 def get_user(username):
