@@ -4,19 +4,23 @@ import random
 import socket
 import logging
 import threading
-from config.server_config import IP, PORT
+import pyaudio
+from config.server_config import IP, PORT1, PORT2
 from server.database import get_user, add_user
+from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
 
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-
 class Server:
     def __init__(self):
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #数据、文件传输TCP套接字
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+         
+        self.audio_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #音频传输UDP套接字
+
         self.buffer = 2048
 
         self.active_dict = {}
@@ -64,6 +68,26 @@ class Server:
                         {"type": "broadcast", "from": username, "content": message}
                     ).encode()
                 )
+    def audio_chat(self, target_name):
+        #接受来自客户端端数据包
+        try:
+            while True:
+                packet, client_address = self.audio_server.recvfrom(CHUNK + 50)
+                data = packet[:CHUNK]
+                target_name = packet[CHUNK:].decode().strip('\x00')
+                target_ip = self.active_dict[target_name]["ip"]
+                
+                ####FIX HERE####
+
+                target_port = 0 #port????
+                
+                ####FIX HERE####
+
+                target_address = (target_ip, target_port)
+                self.audio_server.sendto(data, target_address)
+        except KeyboardInterrupt:
+            print("服务器语音服务结束")
+        
 
     def user_thread(self, active_name):
         """专门接收该用户消息并进行处理的线程
@@ -92,7 +116,13 @@ class Server:
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.braodcast(active_name, body["content"])
 
-                # elif body["type"] == "chat":
+                elif body["type"] == "audio":
+                    logging.info(f"[User] {active_name} ->(audio) {body['to']}")
+                    target_name = body["to"]
+                    if target_name in self.active_dict.keys():
+                        # 如果目标用户在活动列表中, 则发送语音消息
+                        self.audio_chat()
+
                 else:
                     logging.info(f"[User] {active_name} -> {body['to']}")
                     target_name = body["to"]
@@ -303,8 +333,10 @@ class Server:
 
     def start(self):
         """服务器, 启动!"""
-        logging.info(f"绑定地址 {IP}:{PORT}")
-        self.server.bind((IP, PORT))
+        logging.info(f"绑定地址 {IP}:{PORT1}")
+        self.server.bind((IP, PORT1))
+        logging.info(f"绑定地址 {IP}:{PORT2}")
+        self.audio_server.bind((IP, PORT2))
         logging.info(f"启动服务器")
         self.server.listen(10)
 

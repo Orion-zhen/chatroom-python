@@ -7,9 +7,10 @@ import random
 import logging
 import threading
 import filechunkio
+import pyaudio
 from cmd import Cmd
-from config.server_config import IP, PORT
-
+from config.server_config import IP, PORT1, PORT2, PORT3
+from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -20,7 +21,9 @@ class Client(Cmd):
     def __init__(self):
         super().__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.audio = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.buffer = 2048
+        self.audio_port = -1
         self.username = None
         self.password = None
         self.logged_in = False
@@ -31,7 +34,9 @@ class Client(Cmd):
         # server_port = input("Input server port: ")
         # try:
             # self.to_server.connect((server_ip, int(server_port)))
-            self.to_server.connect((IP, PORT))
+            self.to_server.connect((IP, PORT1))
+            self.audio_port = self.get_available_port()
+            self.audio.bind((socket.gethostbyname(socket.gethostname()), self.audio_port))
             self.cmdloop()
         # except:
         #     logging.error("Failed to connect to server")
@@ -43,6 +48,40 @@ class Client(Cmd):
             message (str): 已经json化的字符串
         """
         self.to_server.send(message.encode())
+    
+    def audio_start(self, target_name):
+        """将语音消息发送到服务器
+
+        Args:
+            message (str): 已经json化的字符串
+        """
+        # 创建音频流
+        audio = pyaudio.PyAudio()
+        stream = audio.open(format=FORMAT, channels=CHANNELS,
+                            rate=RATE, input=True, output=True,
+                            frames_per_buffer=CHUNK)
+        try:
+            while True:
+                # 从麦克风读取音频数据
+                data = stream.read(CHUNK)
+
+                # 发送音频数据到服务器
+                packet = data + target_name.encode()
+                #packet = data
+                self.audio.sendto(packet, (IP, PORT2))
+
+                # 接收来自其他客户端的音频数据
+                data, addr = self.audio.recvfrom(CHUNK * 2)
+                #buffer = self.to_server_audio.recv(self.buffer).decode()
+                #body = json.loads(buffer)
+
+                # 播放音频数据
+                stream.write(data)
+        except KeyboardInterrupt:
+            print("语音聊天结束")
+            stream.stop_stream()
+            stream.close()
+            audio.terminate()
 
     def receive_from_server(self):
         """从服务器接收消息"""
@@ -104,6 +143,7 @@ class Client(Cmd):
     def do_login(self, args=None):
         username = input("Enter your username: ")
         password = input("Enter your password: ")
+        
         self.send_to_server(
             json.dumps(
                 {"type": "login", "username": username, "password": password}
@@ -162,9 +202,22 @@ class Client(Cmd):
                 "content": content,
             }
         )
-
         thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
+    
+    def do_audio(self, args):
+        target_name = args
+        message = json.dumps(
+            {
+                "type": "audio",
+                "from": self.username,
+                "to": target_name,
+            }
+        )
+        thread1 = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
+        thread1.start()
+        thread2 = threading.Thread(target=self.audio_start, args=(target_name,), daemon=True)
+        thread2.start()
 
     def do_broadcast(self, args):
         content = args
