@@ -130,7 +130,8 @@ class Server:
                         "ip": addr[0],
                         "port": addr[1],
                     }
-                    self.active_dict.setdefault(body["username"], activer)
+                    self.active_dict.setdefault(body["username"], {})
+                    self.active_dict[body["username"]] = activer
                     print("已添加到活跃列表")
                     active_socket.send(
                         json.dumps(
@@ -157,6 +158,7 @@ class Server:
                     thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
                     thread.start()
                     print("成功激活用户线程")
+                    print(f"当前用户列表: {self.active_dict.keys()}")
                 else:
                     print("拒绝登陆")
                     active_socket.send(

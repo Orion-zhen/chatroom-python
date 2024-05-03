@@ -28,12 +28,12 @@ class Client(Cmd):
     def start(self):
         # server_ip = input("Input server ip: ")
         # server_port = input("Input server port: ")
-        try:
+        # try:
             # self.to_server.connect((server_ip, int(server_port)))
             self.to_server.connect((IP, PORT))
             self.cmdloop()
-        except:
-            logging.error("Failed to connect to server")
+        # except:
+        #     logging.error("Failed to connect to server")
 
     def send_to_server(self, message):
         """将消息发送到服务器
@@ -52,6 +52,7 @@ class Client(Cmd):
                 
                 if body["type"] == "approval":
                     if not self.ftp_host:
+                        print("得到响应")
                         self.send_file(body["content"])
                         self.ftp_host.close()
                         self.ftp_host = None
@@ -164,6 +165,7 @@ class Client(Cmd):
         target_name = args[0]
         file_name = args[1]
         ftp_port = self.get_available_port()
+        print("获得可用端口")
         self.ftp_host = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ftp_host.bind(("0.0.0.0", ftp_port))
         
@@ -177,7 +179,9 @@ class Client(Cmd):
                 "content": file_name
             }
         )
+        print("发送请求")
         self.send_to_server(message)
+        print("等待响应")
         
         self.ftp_host.listen()
 
@@ -190,7 +194,7 @@ class Client(Cmd):
         print("Logout success!")
         sys.exit(0)
         
-    def get_available_port():
+    def get_available_port(self):
         while True:
             port = random.randint(10000, 65535)  # 选择一个在self.buffer到65535范围内的端口，这个范围是未注册端口，可以自由使用
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -238,9 +242,10 @@ class Client(Cmd):
             )
             self.send_to_server(message)
             
-            time.sleep(1) # 睡一会儿, 防止发送方还没开始listen
+            time.sleep(3) # 睡一会儿, 防止发送方还没开始listen
             
             # 连接到请求报文中给出的地址, 开始接收文件
+            print("发起连接")
             receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             receiver.connect((target_ip, target_port))
             with filechunkio.open(file_name, 'rb') as f:
@@ -255,6 +260,7 @@ class Client(Cmd):
     
     def send_file(self, file_name: str):
         receiver_socket, _ = self.ftp_host.accept()
+        print("收到连接")
         with filechunkio.open(file_name, "rb") as f:
             while True:
                 chunk = f.read(self.buffer)
