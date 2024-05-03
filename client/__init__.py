@@ -83,7 +83,9 @@ class Client(Cmd):
                         receiver.connect((target_ip, target_port))
                     except:
                         print("连接失败")
-                    with open(file_name, 'wb') as f:
+                    if not os.path.exists(os.path.join(os.path.dirname(__file__), "recv/")):
+                        os.makedirs(os.path.join(os.path.dirname(__file__), "recv/"))
+                    with open(os.path.join(os.path.join(os.path.dirname(__file__), "recv/"), file_name), 'wb') as f:
                         while True:
                             chunk = receiver.recv(self.buffer)
                             if not chunk:

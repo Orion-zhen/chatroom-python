@@ -1,4 +1,6 @@
+import os
 import json
+import random
 import socket
 import logging
 import threading
@@ -71,9 +73,11 @@ class Server:
             active_name (str): 一个在线的用户名, 对应self.active_list中的一个键
         """
         while True:
-            try:
+            # try:
                 print("尝试用户线程读取消息")
-                buffer = self.active_dict[active_name]["socket"].recv(self.buffer).decode()
+                buffer = (
+                    self.active_dict[active_name]["socket"].recv(self.buffer).decode()
+                )
                 body = json.loads(buffer)
 
                 if body["type"] == "logout":
@@ -83,11 +87,11 @@ class Server:
                     self.active_dict.pop(active_name)
                     # 结束该用户线程
                     break
-                
+
                 elif body["type"] == "broadcast":
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.braodcast(active_name, body["content"])
-                
+
                 # elif body["type"] == "chat":
                 else:
                     logging.info(f"[User] {active_name} -> {body['to']}")
@@ -96,16 +100,53 @@ class Server:
                         # 如果目标用户在活动列表中, 则发送消息
                         target_socket = self.active_dict[target_name]["socket"]
                         target_socket.send(buffer.encode())
+                    elif body["type"] == "ftp_request":
+                        # 离线文件, 暂存至对应文件夹中
+                        print("暂存离线文件")
+                        sender_ip = body["ip"]
+                        sender_port = body["port"]
+                        file_name = body["content"]
+                        receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        receiver.connect((sender_ip, sender_port))
+                        if not os.path.exists(
+                            os.path.join(
+                                os.path.dirname(__file__), f"cache/{target_name}"
+                            )
+                        ):
+                            os.makedirs(
+                                os.path.join(
+                                    os.path.dirname(__file__), f"cache/{target_name}"
+                                )
+                            )
+                        with open(
+                            os.path.join(
+                                os.path.dirname(__file__),
+                                f"cache/{target_name}",
+                                file_name,
+                            ),
+                            "wb",
+                        ) as f:
+                            while True:
+                                data = receiver.recv(1024)
+                                if not data:
+                                    break
+                                f.write(data)
+                        self.message_queue.setdefault(target_name, [])
+                        self.message_queue[target_name].append(body)
+                        print(self.message_queue[target_name])
                     else:
+                        print("暂存消息")
                         # 如果目标用户不在活动列表中, 则暂存消息
-                        self.message_queue.setdefault(target_name, []).append(body)
+                        self.message_queue.setdefault(target_name, [])
+                        self.message_queue[target_name].append(body)
+                        print(self.message_queue[target_name])
 
-            except Exception:
-                logging.error(
-                    f"连接失效: {self.active_dict[active_name]['socket'].getsockname()}, {self.active_dict[active_name]['socket'].fileno()}"
-                )
-                self.active_dict[active_name]["socket"].close()
-                self.active_dict.pop(active_name)
+            # except Exception:
+            #     logging.error(
+            #         f"连接失效: {self.active_dict[active_name]['socket'].getsockname()}, {self.active_dict[active_name]['socket'].fileno()}"
+            #     )
+            #     self.active_dict[active_name]["socket"].close()
+            #     self.active_dict.pop(active_name)
 
     def wait_for_login(self, active_socket, addr):
         """对于服务器端接收到的连接, 进入等待登录函数, 等待该连接的发起方发送登录或注册信息
@@ -141,21 +182,58 @@ class Server:
                             }
                         ).encode()
                     )
-                    print("已发送成功消息")
 
                     # 在登录成功后检查离线消息
+                    print("检查离线消息")
                     if body["username"] in self.message_queue:
                         for msg in self.message_queue[body["username"]]:
                             if msg["type"] == "chat":
+                                print(msg)
                                 active_socket.send(json.dumps(msg).encode())
                             elif msg["type"].startswith("ftp"):
                                 # 待实现: 离线文件传输
-                                pass
+                                file_path = os.path.join(
+                                    os.path.dirname(__file__),
+                                    f"cache/{msg['to']}",
+                                    msg["content"],
+                                )
+                                file_name = msg["content"]
+                                ftp_port = self.get_available_port()
+                                ftp_tmp_socket = socket.socket(
+                                    socket.AF_INET, socket.SOCK_STREAM
+                                )
+                                ftp_tmp_socket.bind(("0.0.0.0", ftp_port))
+
+                                ftp_req = json.dumps(
+                                    {
+                                        "type": "ftp_request",
+                                        "from": msg["from"],
+                                        "to": msg["to"],
+                                        "ip": str(
+                                            socket.gethostbyname(socket.gethostname())
+                                        ),
+                                        "port": ftp_port,
+                                        "content": file_name,
+                                    }
+                                )
+                                active_socket.send(ftp_req.encode())
+                                ftp_tmp_socket.listen()
+                                receiver_socket, _ = ftp_tmp_socket.accept()
+                                with open(file_path, "rb") as f:
+                                    while True:
+                                        chunk = f.read(self.buffer)
+                                        if not chunk:
+                                            break
+                                        receiver_socket.send(chunk)
+                                receiver_socket.close()
+                                ftp_tmp_socket.close()
                         # 删除已读消息
-                        self.message_queue.pop(body["username"])
+                        del self.message_queue[body["username"]]
 
                     # 开启用户线程
-                    thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
+                    thread = threading.Thread(
+                        target=self.user_thread, args=(body["username"],), daemon=True
+                    )
                     thread.start()
                     print("成功激活用户线程")
                     print(f"当前用户列表: {self.active_dict.keys()}")
@@ -181,7 +259,7 @@ class Server:
                             {"type": "approval", "content": "signup success"}
                         ).encode()
                     )
-                    
+
                     # 添加到活跃列表
                     activer = {
                         "socket": active_socket,
@@ -190,7 +268,9 @@ class Server:
                     }
                     self.active_dict.setdefault(body["username"], activer)
                     # 开启用户线程
-                    thread = threading.Thread(target=self.user_thread, args=(body["username"],), daemon=True)
+                    thread = threading.Thread(
+                        target=self.user_thread, args=(body["username"],), daemon=True
+                    )
                     thread.start()
                     print("成功激活用户线程")
                 else:
@@ -206,6 +286,20 @@ class Server:
                 f"无法连接: {active_socket.getsockname()}, {active_socket.fileno()}"
             )
             active_socket.close()
+
+    def get_available_port(self):
+        while True:
+            port = random.randint(
+                10000, 65535
+            )  # 选择一个在self.buffer到65535范围内的端口，这个范围是未注册端口，可以自由使用
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.bind(("localhost", port))  # 尝试绑定到这个端口
+                sock.close()  # 如果成功，关闭socket
+                return port  # 返回这个可用的端口
+            except socket.error as e:
+                # 如果端口已被使用，捕获异常并继续循环
+                pass
 
     def start(self):
         """服务器, 启动!"""
