@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import json
@@ -51,13 +52,13 @@ class Client(Cmd):
                 body = json.loads(buffer)
                 
                 if body["type"] == "approval":
-                    if not self.ftp_host:
+                    # if not self.ftp_host:
                         print("得到响应")
                         self.send_file(body["content"])
                         self.ftp_host.close()
                         self.ftp_host = None
-                    else:
-                        print(body["content"])
+                    # else:
+                    #     print(body["content"])
                 
                 elif body["type"] == "denial":
                     if not self.ftp_host:
@@ -73,14 +74,27 @@ class Client(Cmd):
                 elif body["type"] == "ftp_request":
                     # 收到ftp请求, 连接到对方开启的端口
                     print(f"[FTP] {body['from']}: {body['content']}")
-                    decision = input("Receive it?[Y/n]: ").lower()[0]
-                    self.decide_ftp(decision, body)
+                    target_ip = body['ip']
+                    target_port = body['port']
+                    file_name = body['content']
+                    print("发起连接")
+                    receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    receiver.connect((target_ip, target_port))
+                    with filechunkio.open(file_name, 'rb') as f:
+                        while True:
+                            chunk = receiver.recv(self.buffer)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                    
+                    print(f"Successfully received file {file_name} from {target_ip}")
+                    receiver.close()
                 elif body["type"] == "ftp_replay":
                     pass
 
             except Exception:
                 logging.error("Cannot receive message from server")
-                break
+                # break
 
     def do_login(self, args=None):
         username = input("Enter your username: ")
@@ -163,7 +177,8 @@ class Client(Cmd):
     def do_ftp(self, args):
         args = args.split(" ")
         target_name = args[0]
-        file_name = args[1]
+        file_path = args[1]
+        file_name = os.path.basename(file_path)
         ftp_port = self.get_available_port()
         print("获得可用端口")
         self.ftp_host = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -184,6 +199,16 @@ class Client(Cmd):
         print("等待响应")
         
         self.ftp_host.listen()
+        
+        receiver_socket, _ = self.ftp_host.accept()
+        print("收到连接")
+        with filechunkio.open(file_path, "rb") as f:
+            while True:
+                chunk = f.read(self.buffer)
+                if not chunk:
+                    break
+                receiver_socket.send(chunk)
+        receiver_socket.close()
 
     def do_logout(self, args=None):
         message = json.dumps({"type": "logout", "username": self.username})
