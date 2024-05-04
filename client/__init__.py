@@ -8,8 +8,9 @@ import logging
 import threading
 import filechunkio
 import pyaudio
+import vidstream
 from cmd import Cmd
-from config.server_config import IP, PORT1, PORT2, PORT3
+from config.server_config import IP, PORT1, PORT2
 from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
 
 logging.basicConfig(
@@ -21,13 +22,13 @@ class Client(Cmd):
     def __init__(self):
         super().__init__()
         self.to_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.audio = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.buffer = 2048
-        self.audio_port = -1
         self.username = None
         self.password = None
         self.logged_in = False
         self.ftp_host = None
+        self.audio_sender = None
+        self.audio_receiver = None
 
     def start(self):
         # server_ip = input("Input server ip: ")
@@ -35,8 +36,6 @@ class Client(Cmd):
         # try:
             # self.to_server.connect((server_ip, int(server_port)))
             self.to_server.connect((IP, PORT1))
-            self.audio_port = self.get_available_port()
-            self.audio.bind((socket.gethostbyname(socket.gethostname()), self.audio_port))
             self.cmdloop()
         # except:
         #     logging.error("Failed to connect to server")
@@ -49,12 +48,12 @@ class Client(Cmd):
         """
         self.to_server.send(message.encode())
     
-    def audio_start(self, target_name):
-        """将语音消息发送到服务器
+    """ def audio_start(self, target_name):
+        将语音消息发送到服务器
 
         Args:
             message (str): 已经json化的字符串
-        """
+        
         # 创建音频流
         audio = pyaudio.PyAudio()
         stream = audio.open(format=FORMAT, channels=CHANNELS,
@@ -81,7 +80,7 @@ class Client(Cmd):
             print("语音聊天结束")
             stream.stop_stream()
             stream.close()
-            audio.terminate()
+            audio.terminate() """
 
     def receive_from_server(self):
         """从服务器接收消息"""
@@ -109,7 +108,32 @@ class Client(Cmd):
                     print(f"{body['from']}: {body['content']}")
                 elif body["type"] == "broadcast":
                     print(f"[Broadcast] {body['from']}: {body['content']}")
-
+                elif body["type"] == "audio":
+                    print(f"[Audio] {body['from']}")
+                    if(not self.audio_receiver):
+                        my_ip = socket.gethostbyname(socket.gethostname())
+                        audio_port = self.get_available_port()
+                        message = json.dumps(
+                            {
+                                "type": "audio",
+                                "from": self.username,
+                                "to": body['from'],
+                                "audio_port": audio_port,
+                                "ip": my_ip
+                            }
+                        )
+                        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
+                        thread.start()
+                        self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
+                        receiver_thread = threading.Thread(target=self.audio_receiver.start_server)
+                        receiver_thread.start()
+                    if(not self.audio_sender):
+                        target_ip = body['ip']
+                        target_port = body['audio_port']
+                        self.audio_sender = vidstream.AudioSender(target_ip, target_port)
+                        sender_thread = threading.Thread(target=self.audio_sender.start_stream)
+                        sender_thread.start()
+                        print("开启语音")
                 elif body["type"] == "ftp_request":
                     # 收到ftp请求, 连接到对方开启的端口
                     print(f"[FTP] {body['from']}: {body['content']}")
@@ -139,7 +163,7 @@ class Client(Cmd):
             # except Exception:
             #     logging.error("Cannot receive message from server")
             #     # break
-
+    
     def do_login(self, args=None):
         username = input("Enter your username: ")
         password = input("Enter your password: ")
@@ -207,17 +231,19 @@ class Client(Cmd):
     
     def do_audio(self, args):
         target_name = args
+        my_ip = socket.gethostbyname(socket.gethostname())
+        audio_port = self.get_available_port()
         message = json.dumps(
             {
                 "type": "audio",
                 "from": self.username,
                 "to": target_name,
+                "audio_port": audio_port,
+                "ip": my_ip
             }
         )
-        thread1 = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
-        thread1.start()
-        thread2 = threading.Thread(target=self.audio_start, args=(target_name,), daemon=True)
-        thread2.start()
+        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
+        thread.start()
 
     def do_broadcast(self, args):
         content = args

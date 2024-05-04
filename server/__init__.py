@@ -5,6 +5,7 @@ import socket
 import logging
 import threading
 import pyaudio
+import vidstream
 from config.server_config import IP, PORT1, PORT2
 from server.database import get_user, add_user
 from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
@@ -68,7 +69,7 @@ class Server:
                         {"type": "broadcast", "from": username, "content": message}
                     ).encode()
                 )
-    def audio_chat(self, target_name):
+    """ def audio_chat(self, target_name):
         #接受来自客户端端数据包
         try:
             while True:
@@ -86,7 +87,7 @@ class Server:
                 target_address = (target_ip, target_port)
                 self.audio_server.sendto(data, target_address)
         except KeyboardInterrupt:
-            print("服务器语音服务结束")
+            print("服务器语音服务结束") """
         
 
     def user_thread(self, active_name):
@@ -121,7 +122,23 @@ class Server:
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送语音消息
-                        self.audio_chat()
+                        target_socket = self.active_dict[target_name]["socket"]
+                        sender_name = body["name"]
+                        sender_ip = body["ip"]
+                        sender_port = body["audio_port"]
+                        message = json.dumps(
+                            {
+                                "type": "audio",
+                                "from": sender_name,
+                                "to": target_name,
+                                "ip": sender_ip,
+                                "audio_port": sender_port
+                            }
+                        )
+                        target_socket.send(message.encode())
+                    else:
+                        # 如果目标用户不在活动列表中，则发起语音失败
+                        print("发起语音失败")
 
                 else:
                     logging.info(f"[User] {active_name} -> {body['to']}")
