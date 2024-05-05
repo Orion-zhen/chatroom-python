@@ -19,8 +19,6 @@ class Server:
     def __init__(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #数据、文件传输TCP套接字
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
-         
-        self.audio_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #音频传输UDP套接字
 
         self.buffer = 2048
 
@@ -123,7 +121,7 @@ class Server:
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送语音消息
                         target_socket = self.active_dict[target_name]["socket"]
-                        sender_name = body["name"]
+                        sender_name = body["from"]
                         sender_ip = body["ip"]
                         sender_port = body["audio_port"]
                         message = json.dumps(
@@ -352,8 +350,6 @@ class Server:
         """服务器, 启动!"""
         logging.info(f"绑定地址 {IP}:{PORT1}")
         self.server.bind((IP, PORT1))
-        logging.info(f"绑定地址 {IP}:{PORT2}")
-        self.audio_server.bind((IP, PORT2))
         logging.info(f"启动服务器")
         self.server.listen(10)
 

@@ -228,6 +228,7 @@ class Client(Cmd):
         )
         thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
+        
     
     def do_audio(self, args):
         target_name = args
@@ -244,6 +245,9 @@ class Client(Cmd):
         )
         thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
         thread.start()
+        self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
+        receiver_thread = threading.Thread(target=self.audio_receiver.start_server)
+        receiver_thread.start()
 
     def do_broadcast(self, args):
         content = args
