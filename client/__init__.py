@@ -165,7 +165,7 @@ class Client(Cmd):
                         receiver.connect((target_ip, target_port))
                     except:
                         print("连接失败")
-             buffer.encode()       if not os.path.exists(os.path.join(os.path.dirname(__file__), "recv/")):
+                    if not os.path.exists(os.path.join(os.path.dirname(__file__), "recv/")):
                         os.makedirs(os.path.join(os.path.dirname(__file__), "recv/"))
                     with open(os.path.join(os.path.join(os.path.dirname(__file__), "recv/"), file_name), 'wb') as f:
                         while True:
@@ -182,7 +182,7 @@ class Client(Cmd):
             # except Exception:
             #     logging.error("Cannot receive message from server")
             #     # break
-    buffer.encode()
+    
     def do_login(self, args=None):
         username = input("Enter your username: ")
         password = input("Enter your password: ")
@@ -195,7 +195,7 @@ class Client(Cmd):
         try:
             buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
-            ibuffer.encode()f body["type"] == "approval":
+            if body["type"] == "approval":
                 # 服务器接受登录
                 self.username = username
                 self.password = password
@@ -211,7 +211,7 @@ class Client(Cmd):
             logging.error("Cannot receive message from server")
 
     def do_signup(self, args=None):
-        usernbuffer.encode()ame = input("Enter your username: ")
+        username = input("Enter your username: ")
         password = input("Enter your password: ")
         self.send_to_server(
             json.dumps(
@@ -262,7 +262,7 @@ class Client(Cmd):
                 "ip": my_ip
             }
         )
-        self.send_to_server(message)
+        self.send_to_server
         self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
         receiver_thread = threading.Thread(target=self.audio_receiver.start_server, daemon=True)
         receiver_thread.start()
