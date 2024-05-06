@@ -108,32 +108,51 @@ class Client(Cmd):
                     print(f"{body['from']}: {body['content']}")
                 elif body["type"] == "broadcast":
                     print(f"[Broadcast] {body['from']}: {body['content']}")
-                elif body["type"] == "audio":
-                    print(f"[Audio] {body['from']}")
-                    if(not self.audio_receiver):
-                        my_ip = socket.gethostbyname(socket.gethostname())
-                        audio_port = self.get_available_port()
-                        message = json.dumps(
-                            {
-                                "type": "audio",
-                                "from": self.username,
-                                "to": body['from'],
-                                "audio_port": audio_port,
-                                "ip": my_ip
-                            }
-                        )
-                        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
-                        thread.start()
-                        self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
-                        receiver_thread = threading.Thread(target=self.audio_receiver.start_server)
-                        receiver_thread.start()
-                    if(not self.audio_sender):
-                        target_ip = body['ip']
-                        target_port = body['audio_port']
-                        self.audio_sender = vidstream.AudioSender(target_ip, target_port)
-                        sender_thread = threading.Thread(target=self.audio_sender.start_stream)
-                        sender_thread.start()
-                        print("开启语音")
+                elif body["type"] == "audio_request":
+                    local_ip = socket.gethostbyname(socket.gethostname())
+                    audio_port = self.get_available_port()
+                    message = json.dumps(
+                        {
+                            "type": "audio_response",
+                            "from": self.username,
+                            "to": body['from'],
+                            "audio_port": audio_port,
+                            "ip": local_ip
+                        }
+                    )
+                    self.send_to_server(message)
+                    self.audio_receiver = vidstream.AudioReceiver(local_ip, audio_port)
+                    self.audio_sender = vidstream.AudioSender(body['ip'], body['audio_port'])
+                    threading.Thread(target=self.audio_sender.start_stream, daemon=True).start()
+                    threading.Thread(target=self.audio_receiver.start_server, daemon=True).start()
+                elif body["type"] == "audio_response":
+                    self.audio_sender = vidstream.AudioSender(body['ip'], body['audio_port'])
+                    threading.Thread(target=self.audio_sender.start_stream, daemon=True).start()
+                    # print(f"[Audio] {body['from']}")
+                    # if(not self.audio_receiver):
+                    #     my_ip = socket.gethostbyname(socket.gethostname())
+                    #     audio_port = self.get_available_port()
+                    #     message = json.dumps(
+                    #         {
+                    #             "type": "audio",
+                    #             "from": self.username,
+                    #             "to": body['from'],
+                    #             "audio_port": audio_port,
+                    #             "ip": my_ip
+                    #         }
+                    #     )
+                    #     thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
+                    #     thread.start()
+                    #     self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
+                    #     receiver_thread = threading.Thread(target=self.audio_receiver.start_server)
+                    #     receiver_thread.start()
+                    # if(not self.audio_sender):
+                    #     target_ip = body['ip']
+                    #     target_port = body['audio_port']
+                    #     self.audio_sender = vidstream.AudioSender(target_ip, target_port)
+                    #     sender_thread = threading.Thread(target=self.audio_sender.start_stream)
+                    #     sender_thread.start()
+                    #     print("开启语音")
                 elif body["type"] == "ftp_request":
                     # 收到ftp请求, 连接到对方开启的端口
                     print(f"[FTP] {body['from']}: {body['content']}")
@@ -146,7 +165,7 @@ class Client(Cmd):
                         receiver.connect((target_ip, target_port))
                     except:
                         print("连接失败")
-                    if not os.path.exists(os.path.join(os.path.dirname(__file__), "recv/")):
+             buffer.encode()       if not os.path.exists(os.path.join(os.path.dirname(__file__), "recv/")):
                         os.makedirs(os.path.join(os.path.dirname(__file__), "recv/"))
                     with open(os.path.join(os.path.join(os.path.dirname(__file__), "recv/"), file_name), 'wb') as f:
                         while True:
@@ -163,7 +182,7 @@ class Client(Cmd):
             # except Exception:
             #     logging.error("Cannot receive message from server")
             #     # break
-    
+    buffer.encode()
     def do_login(self, args=None):
         username = input("Enter your username: ")
         password = input("Enter your password: ")
@@ -176,7 +195,7 @@ class Client(Cmd):
         try:
             buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
-            if body["type"] == "approval":
+            ibuffer.encode()f body["type"] == "approval":
                 # 服务器接受登录
                 self.username = username
                 self.password = password
@@ -192,7 +211,7 @@ class Client(Cmd):
             logging.error("Cannot receive message from server")
 
     def do_signup(self, args=None):
-        username = input("Enter your username: ")
+        usernbuffer.encode()ame = input("Enter your username: ")
         password = input("Enter your password: ")
         self.send_to_server(
             json.dumps(
@@ -236,17 +255,16 @@ class Client(Cmd):
         audio_port = self.get_available_port()
         message = json.dumps(
             {
-                "type": "audio",
+                "type": "audio_request",
                 "from": self.username,
                 "to": target_name,
                 "audio_port": audio_port,
                 "ip": my_ip
             }
         )
-        thread = threading.Thread(target=self.send_to_server, args=(message,), daemon=True)
-        thread.start()
+        self.send_to_server(message)
         self.audio_receiver = vidstream.AudioReceiver(my_ip, audio_port)
-        receiver_thread = threading.Thread(target=self.audio_receiver.start_server)
+        receiver_thread = threading.Thread(target=self.audio_receiver.start_server, daemon=True)
         receiver_thread.start()
 
     def do_broadcast(self, args):

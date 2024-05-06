@@ -115,31 +115,31 @@ class Server:
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.braodcast(active_name, body["content"])
 
-                elif body["type"] == "audio":
-                    logging.info(f"[User] {active_name} ->(audio) {body['to']}")
-                    target_name = body["to"]
-                    if target_name in self.active_dict.keys():
-                        # 如果目标用户在活动列表中, 则发送语音消息
-                        target_socket = self.active_dict[target_name]["socket"]
-                        sender_name = body["from"]
-                        sender_ip = body["ip"]
-                        sender_port = body["audio_port"]
-                        message = json.dumps(
-                            {
-                                "type": "audio",
-                                "from": sender_name,
-                                "to": target_name,
-                                "ip": sender_ip,
-                                "audio_port": sender_port
-                            }
-                        )
-                        target_socket.send(message.encode())
-                    else:
-                        # 如果目标用户不在活动列表中，则发起语音失败
-                        print("发起语音失败")
+                # elif body["type"] == "audio":
+                #     logging.info(f"[User] {active_name} ->(audio) {body['to']}")
+                #     target_name = body["to"]
+                #     if target_name in self.active_dict.keys():
+                #         # 如果目标用户在活动列表中, 则发送语音消息
+                #         target_socket = self.active_dict[target_name]["socket"]
+                #         sender_name = body["from"]
+                #         sender_ip = body["ip"]
+                #         sender_port = body["audio_port"]
+                #         message = json.dumps(
+                #             {
+                #                 "type": "audio",
+                #                 "from": sender_name,
+                #                 "to": target_name,
+                #                 "ip": sender_ip,
+                #                 "audio_port": sender_port
+                #             }
+                #         )
+                #         target_socket.send(message.encode())
+                #     else:
+                #         # 如果目标用户不在活动列表中，则发起语音失败
+                #         print("发起语音失败")
 
                 else:
-                    logging.info(f"[User] {active_name} -> {body['to']}")
+                    logging.info(f"[User] {active_name} [{body["type"]}] -> {body['to']}")
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息
