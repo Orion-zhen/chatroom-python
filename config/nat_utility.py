@@ -1,5 +1,5 @@
 import stun
-import requests
+#import requests
 
 def get_public_ip_port():
     nat_type, external_ip, external_port = stun.get_ip_info(stun_host='stun.l.google.com', stun_port=19302)
