@@ -115,7 +115,7 @@ class Server:
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.braodcast(active_name, body["content"])
                 else:
-                    logging.info(f"[User] {active_name} [{body["type"]}] -> {body['to']}")
+                    logging.info(f"[User] {active_name} [{body['type']}] -> {body['to']}")
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息

@@ -111,8 +111,10 @@ class Client(Cmd):
                 print(f"[Broadcast] {body['from']}: {body['content']}")
             elif body["type"] == "audio_request":
                 print(f"[Audio] {body['from']}")
-                local_ip = socket.gethostbyname(socket.gethostname())
-                audio_port = self.get_available_port()
+                #local_ip = socket.gethostbyname(socket.gethostname())
+                local_ip = '192.168.1.114'
+                #audio_port = self.get_available_port()
+                audio_port = 7070
                 message = json.dumps(
                     {
                         "type": "audio_response",
@@ -123,16 +125,20 @@ class Client(Cmd):
                     }
                 )
                 self.send_to_server(message)
-                self.audio_receiver = vidstream.AudioReceiver(local_ip, audio_port)
-                self.audio_sender = vidstream.AudioSender(
-                    body["ip"], body["audio_port"]
-                )
-                threading.Thread(
-                    target=self.audio_sender.start_stream, daemon=True
-                ).start()
-                threading.Thread(
-                    target=self.audio_receiver.start_server, daemon=True
-                ).start()
+                try:
+                    self.audio_receiver = vidstream.AudioReceiver(local_ip, audio_port)
+                    self.audio_sender = vidstream.AudioSender(
+                        str(body["ip"]), int(body["audio_port"])
+                    )
+                    threading.Thread(
+                        target=self.audio_receiver.start_server, daemon=True
+                    ).start()
+                    threading.Thread(
+                        target=self.audio_sender.start_stream, daemon=True
+                    ).start()
+                    
+                except:
+                    print("开启错误")
             elif body["type"] == "audio_response":
                 self.audio_sender = vidstream.AudioSender(
                     body["ip"], body["audio_port"]
@@ -240,8 +246,10 @@ class Client(Cmd):
 
     def do_audio(self, args):
         target_name = args
-        my_ip = socket.gethostbyname(socket.gethostname())
-        audio_port = self.get_available_port()
+        #my_ip = socket.gethostbyname(socket.gethostname())
+        #audio_port = self.get_available_port()
+        my_ip = '192.168.1.114'
+        audio_port = 7070
         message = json.dumps(
             {
                 "type": "audio_request",
