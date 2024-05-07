@@ -82,6 +82,22 @@ class Client(Cmd):
             stream.stop_stream()
             stream.close()
             audio.terminate() """
+    
+    def print_content(self, content):
+        length = len(content)
+        i = 0
+        while i < length:
+            if content[i] == '\\':
+                if i != length - 1:
+                    if content[i + 1] == 'n':
+                        i += 1
+                        print('\n', end='')
+                else:
+                    print(content[i])
+            else:
+                print(content[i], end='')
+            i += 1
+        print('\n')
 
     def receive_from_server(self):
         """从服务器接收消息"""
@@ -106,9 +122,11 @@ class Client(Cmd):
                 print(body["content"])
 
             elif body["type"] == "chat":
-                print(f"{body['from']}: {body['content']}")
+                print(body['from'], end=":\n") 
+                self.print_content(body['content'])
             elif body["type"] == "broadcast":
-                print(f"[Broadcast] {body['from']}: {body['content']}")
+                print(f"[Broadcast] {body['from']}:")
+                self.print_content(body['content'])
             elif body["type"] == "audio_request":
                 print(f"[Audio] {body['from']}")
                 #local_ip = socket.gethostbyname(socket.gethostname())
@@ -404,3 +422,5 @@ class Client(Cmd):
                     break
                 receiver_socket.send(chunk)
         receiver_socket.close()
+    
+    
