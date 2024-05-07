@@ -4,12 +4,9 @@ import random
 import socket
 import logging
 import threading
-import pyaudio
-import vidstream
 from config.server_config import IP, PORT
 from server.database import get_user, add_user
-from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
-
+from config.nat_utility import get_public_ip_port, configure_port_mapping
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -29,6 +26,8 @@ class Server:
                 "socket": socket,
                 "ip": ip,
                 "port": port,
+                #"ip": public_ip
+                #"port": public_port
             },
         }
         """
@@ -51,7 +50,7 @@ class Server:
         }
         """
 
-    def braodcast(self, username="system", message=""):
+    def broadcast(self, username="system", message=""):
         """广播消息
 
         Args:
@@ -113,9 +112,9 @@ class Server:
 
                 elif body["type"] == "broadcast":
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
-                    self.braodcast(active_name, body["content"])
+                    self.broadcast(active_name, body["content"])
                 else:
-                    logging.info(f"[User] {active_name} [{body["type"]}] -> {body['to']}")
+                    logging.info(f"[User] {active_name} [{body['type']}] -> {body['to']}")
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息
@@ -191,6 +190,8 @@ class Server:
                         "socket": active_socket,
                         "ip": addr[0],
                         "port": addr[1],
+                        #"ip": body["pubilc_ip"]
+                        #"port": body["public_port"]
                     }
                     self.active_dict.setdefault(body["username"], {})
                     self.active_dict[body["username"]] = activer
@@ -324,11 +325,17 @@ class Server:
 
     def start(self):
         """服务器, 启动!"""
+        #port = 5050
         logging.info(f"绑定地址 {IP}:{PORT}")
         self.server.bind((IP, PORT))
         logging.info(f"启动服务器")
         self.server.listen(10)
-
+        '''配置端口映射
+        route_ip = '0.0.0.0'
+        username = 'admin'
+        password = 'admin'
+        configure_port_mapping(route_ip, username, password, PORT, port)
+        '''
         # 初始化连接
         self.active_dict.clear()
         self.message_queue.clear()

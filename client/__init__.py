@@ -6,16 +6,16 @@ import socket
 import random
 import logging
 import threading
-import filechunkio
-import pyaudio
 import vidstream
+import filechunkio
 from cmd import Cmd
 from config.server_config import IP, PORT
-from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
+from config.nat_utility import get_public_ip_port, configure_port_mapping
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+
 
 
 class Client(Cmd):
@@ -29,12 +29,15 @@ class Client(Cmd):
         self.ftp_host = None
         self.audio_sender = None
         self.audio_receiver = None
+        #self.public_ip = None
+        #self.pubilc_port = None
 
     def start(self):
         # server_ip = input("Input server ip: ")
         # server_port = input("Input server port: ")
         # try:
         # self.to_server.connect((server_ip, int(server_port)))
+        #self.public_ip, self.public_port = get_public_ip_port()
         self.to_server.connect((IP, PORT))
         self.cmdloop()
 
@@ -113,6 +116,12 @@ class Client(Cmd):
                 print(f"[Audio] {body['from']}")
                 local_ip = socket.gethostbyname(socket.gethostname())
                 audio_port = self.get_available_port()
+                '''配置端口映射
+                route_ip = '0.0.0.0'
+                username = 'admin'
+                password = 'admin'
+                configure_port_mapping(route_ip, username, password, self.public_port, audio_port)
+                '''
                 message = json.dumps(
                     {
                         "type": "audio_response",
@@ -180,7 +189,7 @@ class Client(Cmd):
         password = input("Enter your password: ")
 
         self.send_to_server(
-            json.dumps({"type": "login", "username": username, "password": password})
+            json.dumps({"type": "login", "username": username, "password": password})#, "public_ip":self.public_ip, "public_port":self.public_port})
         )
         try:
             buffer = self.to_server.recv(self.buffer).decode()
@@ -200,6 +209,7 @@ class Client(Cmd):
         except Exception:
             logging.error("Cannot receive message from server")
 
+    
     def do_signup(self, args=None):
         username = input("Enter your username: ")
         password = input("Enter your password: ")
@@ -280,6 +290,12 @@ class Client(Cmd):
         file_name = os.path.basename(file_path)
         ftp_port = self.get_available_port()
         print("获得可用端口")
+        '''配置端口映射
+        route_ip = '0.0.0.0'
+        username = 'admin'
+        password = 'admin'
+        configure_port_mapping(route_ip, username, password, self.public_port, ftp_port)
+        '''
         self.ftp_host = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ftp_host.bind(("0.0.0.0", ftp_port))
 
