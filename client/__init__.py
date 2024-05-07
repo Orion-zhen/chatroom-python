@@ -10,8 +10,11 @@ import filechunkio
 import pyaudio
 import vidstream
 from cmd import Cmd
+from colorama import init, Fore, Style
 from config.server_config import IP, PORT
 from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
+
+init()
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -93,9 +96,15 @@ class Client(Cmd):
                         i += 1
                         print('\n', end='')
                 else:
-                    print(content[i])
+                    if sys.platform == "win32":
+                        print(Fore.YELLOW+content[i]+Style.RESET_ALL)
+                    else:
+                        print("\033[93m"+content[i]+"\033[0m")
             else:
-                print(content[i], end='')
+                if sys.platform == "win32":
+                    print(Fore.YELLOW+content[i]+Style.RESET_ALL, end='')
+                else:
+                    print("\033[93m"+content[i]+"\033[0m", end='')
             i += 1
         print('\n')
 
@@ -122,11 +131,19 @@ class Client(Cmd):
                 print(body["content"])
 
             elif body["type"] == "chat":
-                print(body['from'], end=":\n") 
-                self.print_content(body['content'])
+                if sys.platform == "win32":
+                    print(Fore.BLUE+body['from']+Style.RESET_ALL, end=":\n") 
+                    self.print_content(body['content'])
+                else:
+                    print("\033[94m"+body['from']+"\033[0m", end=":\n") 
+                    self.print_content(body['content'])
             elif body["type"] == "broadcast":
-                print(f"[Broadcast] {body['from']}:")
-                self.print_content(body['content'])
+                if sys.platform == "win32":
+                    print(Fore.BLUE+"[Broadcast]"+body['from']+Style.RESET_ALL,end=":\n")
+                    self.print_content(body['content'])
+                else:
+                    print("\033[94m[Broadcast]\033[0m"+body['from'],end=":\n")
+                    self.print_content(body['content'])
             elif body["type"] == "audio_request":
                 print(f"[Audio] {body['from']}")
                 #local_ip = socket.gethostbyname(socket.gethostname())
