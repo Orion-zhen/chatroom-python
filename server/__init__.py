@@ -6,7 +6,6 @@ import logging
 import threading
 from config.server_config import IP, PORT
 from server.database import get_user, add_user
-from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
 
 
 logging.basicConfig(
