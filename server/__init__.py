@@ -151,12 +151,12 @@ class Server:
                                     break
                                 f.write(data)
                         self.message_queue[target_name] = body
-                        logging.info(f"[Offline] {body["from"]} -> {body["to"]}: {self.message_queue[target_name]}")
+                        logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
                     else:
                         logging.info("暂存消息")
                         # 如果目标用户不在活动列表中, 则暂存消息
                         self.message_queue[target_name] = body
-                        logging.info(f"[Offline] {body["from"]} -> {body["to"]}: {self.message_queue[target_name]}")
+                        logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
 
             except Exception:
                 logging.error(
