@@ -149,12 +149,14 @@ class Server:
                                 if not data:
                                     break
                                 f.write(data)
-                        self.message_queue[target_name] = body
+                        self.message_queue.setdefault(target_name, [])
+                        self.message_queue[target_name].append(body)
                         logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
                     else:
                         logging.info("暂存消息")
                         # 如果目标用户不在活动列表中, 则暂存消息
-                        self.message_queue[target_name] = body
+                        self.message_queue.setdefault(target_name, [])
+                        self.message_queue[target_name].append(body)
                         logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
 
             except Exception:
@@ -202,7 +204,7 @@ class Server:
                     # 在登录成功后检查离线消息
                     print("检查离线消息")
                     if body["username"] in self.message_queue:
-                        for msg in self.message_queue[body["username"]]:
+                        for msg in list(self.message_queue[body["username"]]):
                             if msg["type"] == "chat":
                                 print(msg)
                                 active_socket.send(json.dumps(msg).encode())
