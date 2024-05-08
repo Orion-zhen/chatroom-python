@@ -32,15 +32,18 @@ class Client(Cmd):
         self.audio_receiver = None
 
     def start(self):
-        # server_ip = input("Input server ip: ")
-        # server_port = input("Input server port: ")
-        # try:
-        # self.to_server.connect((server_ip, int(server_port)))
-        self.to_server.connect((IP, PORT))
+        server_ip = input("Input server ip: ")
+        server_port = input("Input server port: ")
+        if server_port == "":
+            server_port = PORT
+        try:
+            self.to_server.connect((server_ip, int(server_port)))
+            # self.to_server.connect((IP, PORT))
+        except:
+            logging.error("Failed to connect to server")
+            sys.exit(0)
+        
         self.cmdloop()
-
-    # except:
-    #     logging.error("Failed to connect to server")
 
     def send_to_server(self, message):
         """将消息发送到服务器
