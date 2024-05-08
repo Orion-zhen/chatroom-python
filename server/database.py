@@ -17,7 +17,7 @@ def get_user(username):
         username TEXT PRIMARY KEY,
         password TEXT NOT NULL
     )''')
-    print("执行数据库搜索")
+    # print("执行数据库搜索")
     row = cursor.execute(f"SELECT * FROM users WHERE username='{username}'").fetchall()
     print(f"搜索结果: {row}")
     if row == []:

@@ -6,8 +6,6 @@ import socket
 import random
 import logging
 import threading
-import filechunkio
-import pyaudio
 import vidstream
 from cmd import Cmd
 from colorama import init, Fore, Style
@@ -85,28 +83,28 @@ class Client(Cmd):
             stream.stop_stream()
             stream.close()
             audio.terminate() """
-    
+
     def print_content(self, content):
         length = len(content)
         i = 0
         while i < length:
-            if content[i] == '\\':
+            if content[i] == "\\":
                 if i != length - 1:
-                    if content[i + 1] == 'n':
+                    if content[i + 1] == "n":
                         i += 1
-                        print('\n', end='')
+                        print("\n", end="")
                 else:
                     if sys.platform == "win32":
-                        print(Fore.YELLOW+content[i]+Style.RESET_ALL)
+                        print(Fore.YELLOW + content[i] + Style.RESET_ALL)
                     else:
-                        print("\033[93m"+content[i]+"\033[0m")
+                        print("\033[93m" + content[i] + "\033[0m")
             else:
                 if sys.platform == "win32":
-                    print(Fore.YELLOW+content[i]+Style.RESET_ALL, end='')
+                    print(Fore.YELLOW + content[i] + Style.RESET_ALL, end="")
                 else:
-                    print("\033[93m"+content[i]+"\033[0m", end='')
+                    print("\033[93m" + content[i] + "\033[0m", end="")
             i += 1
-        print('\n')
+        print("\n")
 
     def receive_from_server(self):
         """从服务器接收消息"""
@@ -114,15 +112,6 @@ class Client(Cmd):
             # try:
             buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
-
-            # if body["type"] == "approval":
-            # if not self.ftp_host:
-            # print("得到响应")
-            # self.send_file(body["content"])
-            # self.ftp_host.close()
-            # self.ftp_host = None
-            # else:
-            #     print(body["content"])
 
             if body["type"] == "denial":
                 if not self.ftp_host:
@@ -132,24 +121,27 @@ class Client(Cmd):
 
             elif body["type"] == "chat":
                 if sys.platform == "win32":
-                    print(Fore.BLUE+body['from']+Style.RESET_ALL, end=":\n") 
-                    self.print_content(body['content'])
+                    print(Fore.BLUE + body["from"] + Style.RESET_ALL, end=":\n")
+                    self.print_content(body["content"])
                 else:
-                    print("\033[94m"+body['from']+"\033[0m", end=":\n") 
-                    self.print_content(body['content'])
+                    print("\033[94m" + body["from"] + "\033[0m", end=":\n")
+                    self.print_content(body["content"])
             elif body["type"] == "broadcast":
                 if sys.platform == "win32":
-                    print(Fore.BLUE+"[Broadcast]"+body['from']+Style.RESET_ALL,end=":\n")
-                    self.print_content(body['content'])
+                    print(
+                        Fore.BLUE + "[Broadcast]" + body["from"] + Style.RESET_ALL,
+                        end=":\n",
+                    )
+                    self.print_content(body["content"])
                 else:
-                    print("\033[94m[Broadcast]\033[0m"+body['from'],end=":\n")
-                    self.print_content(body['content'])
+                    print("\033[94m[Broadcast]\033[0m" + body["from"], end=":\n")
+                    self.print_content(body["content"])
             elif body["type"] == "audio_request":
                 print(f"[Audio] {body['from']}")
-                #local_ip = socket.gethostbyname(socket.gethostname())
-                local_ip = '192.168.1.114'
-                #audio_port = self.get_available_port()
-                audio_port = 7070
+                local_ip = socket.gethostbyname(socket.gethostname())
+                # local_ip = '192.168.1.114'
+                audio_port = self.get_available_port()
+                # audio_port = 7070
                 message = json.dumps(
                     {
                         "type": "audio_response",
@@ -171,7 +163,7 @@ class Client(Cmd):
                     threading.Thread(
                         target=self.audio_sender.start_stream, daemon=True
                     ).start()
-                    
+
                 except:
                     print("开启错误")
             elif body["type"] == "audio_response":
@@ -281,10 +273,10 @@ class Client(Cmd):
 
     def do_audio(self, args):
         target_name = args
-        #my_ip = socket.gethostbyname(socket.gethostname())
-        #audio_port = self.get_available_port()
-        my_ip = '192.168.1.114'
-        audio_port = 7070
+        my_ip = socket.gethostbyname(socket.gethostname())
+        audio_port = self.get_available_port()
+        # my_ip = '192.168.1.114'
+        # audio_port = 7070
         message = json.dumps(
             {
                 "type": "audio_request",
@@ -376,68 +368,3 @@ class Client(Cmd):
             except socket.error as e:
                 # 如果端口已被使用，捕获异常并继续循环
                 pass
-
-    def decide_ftp(self, decision: str, body: dict):
-        """根据参数决定是否接受FTP连接, 是则开始接收文件
-
-        Args:
-            decision (str): 决定选项
-            body (dict): FTP请求报文
-        """
-        target_name = body["from"]
-        target_ip = body["ip"]
-        target_port = body["port"]
-        file_name = body["content"]
-        if decision != "y":
-            # 否决FTP连接, 通过服务器送到发起方
-            message = json.dumps(
-                {
-                    "type": "denial",
-                    "from": self.username,
-                    "to": target_name,
-                    "content": "FTP refused",
-                }
-            )
-
-            self.send_to_server(message)
-
-        else:
-            # 发送同意报文, 让发送方开始发送文件
-            message = json.dumps(
-                {
-                    "type": "approval",
-                    "from": self.username,
-                    "to": target_name,
-                    "content": file_name,
-                }
-            )
-            self.send_to_server(message)
-
-            time.sleep(3)  # 睡一会儿, 防止发送方还没开始listen
-
-            # 连接到请求报文中给出的地址, 开始接收文件
-            print("发起连接")
-            receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            receiver.connect((target_ip, target_port))
-            with open(file_name, "rb") as f:
-                while True:
-                    chunk = receiver.recv(self.buffer)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-
-            print(f"Successfully received file {file_name} from {target_name}")
-            receiver.close()
-
-    def send_file(self, file_name: str):
-        receiver_socket, _ = self.ftp_host.accept()
-        print("收到连接")
-        with filechunkio.open(file_name, "rb") as f:
-            while True:
-                chunk = f.read(self.buffer)
-                if not chunk:
-                    break
-                receiver_socket.send(chunk)
-        receiver_socket.close()
-    
-    
