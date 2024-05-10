@@ -12,10 +12,13 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
+
 class Server:
     def __init__(self):
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #数据、文件传输TCP套接字
-        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        self.server = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        )  # 数据、文件传输TCP套接字
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         self.buffer = 2048
 
@@ -64,26 +67,6 @@ class Server:
                         {"type": "broadcast", "from": username, "content": message}
                     ).encode()
                 )
-    """ def audio_chat(self, target_name):
-        #接受来自客户端端数据包
-        try:
-            while True:
-                packet, client_address = self.audio_server.recvfrom(CHUNK + 50)
-                data = packet[:CHUNK]
-                target_name = packet[CHUNK:].decode().strip('\x00')
-                target_ip = self.active_dict[target_name]["ip"]
-                
-                ####FIX HERE####
-
-                target_port = 0 #port????
-                
-                ####FIX HERE####
-
-                target_address = (target_ip, target_port)
-                self.audio_server.sendto(data, target_address)
-        except KeyboardInterrupt:
-            print("服务器语音服务结束") """
-        
 
     def user_thread(self, active_name):
         """专门接收该用户消息并进行处理的线程
@@ -112,7 +95,9 @@ class Server:
                     logging.info(f"[User] {active_name} 广播消息: {body['content']}")
                     self.broadcast(active_name, body["content"])
                 else:
-                    logging.info(f"[User] {active_name} [{body['type']}] -> {body['to']}")
+                    logging.info(
+                        f"[User] {active_name} [{body['type']}] -> {body['to']}"
+                    )
                     target_name = body["to"]
                     if target_name in self.active_dict.keys():
                         # 如果目标用户在活动列表中, 则发送消息
@@ -151,13 +136,17 @@ class Server:
                                 f.write(data)
                         self.message_queue.setdefault(target_name, [])
                         self.message_queue[target_name].append(body)
-                        logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
+                        logging.info(
+                            f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}"
+                        )
                     else:
                         logging.info("暂存消息")
                         # 如果目标用户不在活动列表中, 则暂存消息
                         self.message_queue.setdefault(target_name, [])
                         self.message_queue[target_name].append(body)
-                        logging.info(f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}")
+                        logging.info(
+                            f"[Offline] {body['from']} -> {body['to']}: {self.message_queue[target_name]}"
+                        )
 
             except Exception:
                 logging.error(
@@ -173,16 +162,12 @@ class Server:
             active_socket (socket.socket): 收到的连接
             addr (tuple(ip, port)): 连接来源
         """
-        # print("进入等待登陆线程")
         try:
-            # print("尝试接收消息")
             buffer = active_socket.recv(self.buffer).decode()
             body = json.loads(buffer)
-            # print("接收消息成功")
             if body["type"] == "login":
                 data_base_info = get_user(body["username"])
                 if data_base_info != None and body["password"] == data_base_info[1]:
-                    # print("密码正确")
                     # 数据库中有并且密码正确
                     activer = {
                         "socket": active_socket,
@@ -191,7 +176,6 @@ class Server:
                     }
                     self.active_dict.setdefault(body["username"], {})
                     self.active_dict[body["username"]] = activer
-                    # print("已添加到活跃列表")
                     active_socket.send(
                         json.dumps(
                             {
@@ -265,11 +249,8 @@ class Server:
 
             elif body["type"] == "signup":
                 logging.info("注册请求")
-                # print("搜索数据库")
                 data_base_info = get_user(body["username"])
-                print(f"数据库返回结果: {data_base_info}")
                 if data_base_info == None:
-                    print("数据库中没有该用户名, 注册之")
                     # 数据库中没有该用户名, 则注册之
                     add_user(body["username"], body["password"])
                     active_socket.send(

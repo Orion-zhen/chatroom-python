@@ -10,7 +10,6 @@ import vidstream
 from cmd import Cmd
 from colorama import init, Fore, Style
 from config.server_config import IP, PORT
-from config.audio_config import CHUNK, FORMAT, CHANNELS, RATE
 
 init()
 
@@ -34,15 +33,16 @@ class Client(Cmd):
     def start(self):
         server_ip = input("Input server ip: ")
         server_port = input("Input server port: ")
+        if server_ip == "":
+            server_ip = "127.0.0.1"
         if server_port == "":
             server_port = PORT
         try:
             self.to_server.connect((server_ip, int(server_port)))
-            # self.to_server.connect((IP, PORT))
         except:
             logging.error("Failed to connect to server")
             sys.exit(0)
-        
+
         self.cmdloop()
 
     def send_to_server(self, message):
@@ -52,40 +52,6 @@ class Client(Cmd):
             message (str): 已经json化的字符串
         """
         self.to_server.send(message.encode())
-
-    """ def audio_start(self, target_name):
-        将语音消息发送到服务器
-
-        Args:
-            message (str): 已经json化的字符串
-        
-        # 创建音频流
-        audio = pyaudio.PyAudio()
-        stream = audio.open(format=FORMAT, channels=CHANNELS,
-                            rate=RATE, input=True, output=True,
-                            frames_per_buffer=CHUNK)
-        try:
-            while True:
-                # 从麦克风读取音频数据
-                data = stream.read(CHUNK)
-
-                # 发送音频数据到服务器
-                packet = data + target_name.encode()
-                #packet = data
-                self.audio.sendto(packet, (IP, PORT2))
-
-                # 接收来自其他客户端的音频数据
-                data, addr = self.audio.recvfrom(CHUNK * 2)
-                #buffer = self.to_server_audio.recv(self.buffer).decode()
-                #body = json.loads(buffer)
-
-                # 播放音频数据
-                stream.write(data)
-        except KeyboardInterrupt:
-            print("语音聊天结束")
-            stream.stop_stream()
-            stream.close()
-            audio.terminate() """
 
     def print_content(self, content):
         length = len(content)
@@ -112,7 +78,6 @@ class Client(Cmd):
     def receive_from_server(self):
         """从服务器接收消息"""
         while self.logged_in:
-            # try:
             buffer = self.to_server.recv(self.buffer).decode()
             body = json.loads(buffer)
 
@@ -142,9 +107,7 @@ class Client(Cmd):
             elif body["type"] == "audio_request":
                 print(f"[Audio] {body['from']}")
                 local_ip = socket.gethostbyname(socket.gethostname())
-                # local_ip = '192.168.1.114'
                 audio_port = self.get_available_port()
-                # audio_port = 7070
                 message = json.dumps(
                     {
                         "type": "audio_response",
@@ -206,10 +169,6 @@ class Client(Cmd):
                 receiver.close()
             elif body["type"] == "ftp_replay":
                 pass
-
-        # except Exception:
-        #     logging.error("Cannot receive message from server")
-        #     # break
 
     def do_login(self, args=None):
         username = input("Enter your username: ")
